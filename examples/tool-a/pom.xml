@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <!-- Writer tool: adds entries to the shared store. -->
+  <parent>
+    <groupId>dev.jarsuite.examples</groupId>
+    <artifactId>examples</artifactId>
+    <version>1</version>
+  </parent>
+  <artifactId>tool-a</artifactId>
+  <version>1.0.0</version>
+
+  <dependencies>
+    <dependency>
+      <groupId>dev.jarsuite.examples</groupId>
+      <artifactId>commons</artifactId>
+      <version>${revision}</version>
+    </dependency>
+    <!-- transitive: commons-lang3 3.14.0 -->
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-text</artifactId>
+      <version>1.12.0</version>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <configuration>
+          <archive>
+            <manifest>
+              <mainClass>dev.jarsuite.examples.toola.Main</mainClass>
+            </manifest>
+          </archive>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+</project>

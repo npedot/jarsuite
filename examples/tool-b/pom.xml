@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <!-- Reader tool: lists the entries of the shared store. -->
+  <parent>
+    <groupId>dev.jarsuite.examples</groupId>
+    <artifactId>examples</artifactId>
+    <version>1</version>
+  </parent>
+  <artifactId>tool-b</artifactId>
+  <version>1.0.0</version>
+
+  <dependencies>
+    <dependency>
+      <groupId>dev.jarsuite.examples</groupId>
+      <artifactId>commons</artifactId>
+      <version>${revision}</version>
+    </dependency>
+    <!-- deliberately not the version tool-a gets through commons-text: a harmless misalignment -->
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-lang3</artifactId>
+      <version>3.17.0</version>
+    </dependency>
+    <!-- transitive: slf4j-api -->
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-simple</artifactId>
+      <version>2.0.16</version>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <configuration>
+          <archive>
+            <manifest>
+              <mainClass>dev.jarsuite.examples.toolb.Main</mainClass>
+            </manifest>
+          </archive>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+</project>

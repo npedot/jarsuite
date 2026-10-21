@@ -1,0 +1,19 @@
+# Release of the example suite built from out/aligned-1 (run ./build.sh first).
+[suite]
+name = "demo"
+release = "1.0"
+data_format = 1
+
+[align]
+required = ["dev.jarsuite.examples:commons"]
+
+[jarexec]
+version = "0.3.0"
+
+[[tool]]
+name = "tool-a"
+source = "out/aligned-1"
+
+[[tool]]
+name = "tool-b"
+source = "out/aligned-1"

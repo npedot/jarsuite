@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <!-- Example suite for jarsuite: two tools that share a data file through a common library. -->
+  <groupId>dev.jarsuite.examples</groupId>
+  <artifactId>examples</artifactId>
+  <version>1</version>
+  <packaging>pom</packaging>
+
+  <modules>
+    <module>commons</module>
+    <module>tool-a</module>
+    <module>tool-b</module>
+  </modules>
+
+  <properties>
+    <!-- version of commons, and the data format it reads and writes: build.sh overrides both -->
+    <revision>1.0.0</revision>
+    <data.format>1</data.format>
+    <maven.compiler.release>21</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+  </properties>
+
+  <build>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-jar-plugin</artifactId>
+          <version>3.4.2</version>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+    <plugins>
+      <!-- jarexec snippet: flat list of runtime dependencies with absolute paths -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <version>3.8.1</version>
+        <executions>
+          <execution>
+            <id>jarexec-deps</id>
+            <phase>package</phase>
+            <goals><goal>list</goal></goals>
+            <configuration>
+              <outputFile>${project.build.directory}/jarexec-deps.txt</outputFile>
+              <includeScope>runtime</includeScope>
+              <outputAbsoluteArtifactFilename>true</outputAbsoluteArtifactFilename>
+              <sort>true</sort>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>

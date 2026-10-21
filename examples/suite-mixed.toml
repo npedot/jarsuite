@@ -1,0 +1,19 @@
+# Release of the example suite built from out/mixed (run ./build.sh first).
+[suite]
+name = "demo"
+release = "3.0"
+data_format = 2
+
+[align]
+required = ["dev.jarsuite.examples:commons"]
+
+[jarexec]
+version = "0.3.0"
+
+[[tool]]
+name = "tool-a"
+source = "out/mixed"
+
+[[tool]]
+name = "tool-b"
+source = "out/mixed"
