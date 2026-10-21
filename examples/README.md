@@ -63,3 +63,5 @@ jarsuite run tool-a add hello && jarsuite run tool-b list
 jarsuite init pub/2/suite.toml && jarsuite update      # data format 2
 jarsuite rollback                                      # refused: the data may be in format 2
 ```
+
+`./e2e.sh` runs these steps and checks their outcome: it is what CI runs.

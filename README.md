@@ -134,7 +134,12 @@ format and a mixed release that `assemble` refuses.
 cargo test
 cargo clippy --all-targets -- -D warnings
 cargo clippy --all-targets --features gui -- -D warnings
+(cd examples && ./build.sh && JARSUITE=path/to/jarsuite ./e2e.sh)   # end-to-end, needs Maven and JDK 21
 ```
+
+CI runs these on Linux, Windows and macOS. A `v*` tag that matches the version in
+`Cargo.toml` publishes `jarsuite` and `jarsuite-gui` for the five platforms as a
+GitHub release.
 
 ## License
 

@@ -8,7 +8,7 @@ data_format = 2
 required = ["dev.jarsuite.examples:commons"]
 
 [jarexec]
-version = "0.3.0"
+version = "0.4.0"
 
 [[tool]]
 name = "tool-a"
