@@ -6,6 +6,8 @@ description = "Installs, updates and launches a suite of jarexec applications re
 license = "MIT"
 repository = "https://github.com/npedot/jarsuite"
 readme = "README.md"
+# `cargo run` starts the CLI; the window is `cargo run --features gui --bin jarsuite-gui`
+default-run = "jarsuite"
 
 [profile.release]
 lto = true
