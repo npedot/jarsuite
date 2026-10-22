@@ -111,6 +111,11 @@ jarsuite-gui [--root DIR]
 It finds the installation folder like `jarsuite`, so it can sit next to it. On Windows
 it opens no console; tools that need one open their own.
 
+The *Arguments* field is passed to the tool you launch. The window starts tools in the
+installation folder, whatever folder it was opened from, while `jarsuite run` keeps the
+current one. When a tool exits with an error, the log shows the last lines it wrote to
+standard error.
+
 A tool launched with `jarsuite run` gets `JARSUITE_ROOT` and `JARSUITE_RELEASE` in its
 environment. Only tools started this way count as running: a launcher started
 directly from `releases/<r>/` is not seen by `activate`.

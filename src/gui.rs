@@ -65,7 +65,8 @@ enum Msg {
     Done(Result<String, String>),
     /// The published release, from a check.
     Published(String),
-    ToolExited(String, Result<i32, String>),
+    /// Exit code and end of standard error of a launched tool.
+    ToolExited(String, Result<(i32, String), String>),
 }
 
 /// Current transfer, written by the worker's progress sink and read by the window.
@@ -214,7 +215,8 @@ impl App {
         self.log.push((true, format!("started {tool}")));
         let (root, tx, ctx) = (self.root.clone(), self.tx.clone(), self.ctx.clone());
         std::thread::spawn(move || {
-            let result = crate::run::run(&root, &tool, &args).map_err(|e| format!("{e:#}"));
+            let result =
+                crate::run::run_captured(&root, &tool, &args).map_err(|e| format!("{e:#}"));
             let _ = tx.send(Msg::ToolExited(tool, result));
             ctx.request_repaint();
         });
@@ -239,8 +241,13 @@ impl App {
                         self.running.remove(i);
                     }
                     self.log.push(match result {
-                        Ok(0) => (true, format!("{tool} finished")),
-                        Ok(code) => (false, format!("{tool} exited with code {code}")),
+                        Ok((0, _)) => (true, format!("{tool} finished")),
+                        Ok((code, stderr)) if stderr.is_empty() => {
+                            (false, format!("{tool} exited with code {code}"))
+                        }
+                        Ok((code, stderr)) => {
+                            (false, format!("{tool} exited with code {code}:\n{stderr}"))
+                        }
                         Err(e) => (false, format!("{tool}: {e}")),
                     });
                 }
