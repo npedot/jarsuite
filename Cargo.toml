@@ -1,6 +1,6 @@
 [package]
 name = "jarsuite"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2024"
 description = "Installs, updates and launches a suite of jarexec applications released together"
 license = "MIT"

@@ -76,6 +76,8 @@ impl Default for JarexecDef {
 pub struct ToolDef {
     pub name: String,
     /// Folder or URL holding `<name>.lock`, the JAR and `lib/`, as `jarexec lock` leaves them.
+    /// `{platform}` in it stands for each platform, for tools whose lock differs by
+    /// platform (native libraries).
     pub source: String,
 }
 

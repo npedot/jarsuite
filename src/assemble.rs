@@ -47,59 +47,8 @@ pub fn run(opts: &Options) -> Result<Assembled> {
     if stage.exists() {
         fs::remove_dir_all(&stage).with_context(|| format!("removing {}", stage.display()))?;
     }
-    let files = stage.join("files");
-    fs::create_dir_all(&files).with_context(|| format!("creating {}", files.display()))?;
-
-    // archive path → (SHA-256, tool that brought it): tools share one folder
-    let mut shipped: BTreeMap<String, (String, String)> = BTreeMap::new();
-    let mut locks = Vec::new();
-    for tool in &def.tools {
-        let dir = source::dir_url(source::locate(&tool.source, Some(&def_url))?);
-        let lock_url = dir.join(&format!("{}.lock", tool.name))?;
-        let lock_text = source::read_text(&lock_url)?;
-        let lock =
-            Lockfile::parse(&lock_text).with_context(|| format!("invalid lockfile {lock_url}"))?;
-        let (Some(sha256), Some(size)) = (lock.app.sha256.clone(), lock.app.size) else {
-            bail!("{lock_url} has no SHA-256 for the JAR: regenerate it with jarexec 0.2 or later");
-        };
-        let mut wanted = vec![(lock.app.jar.clone(), sha256, size)];
-        wanted.extend(lock.deps.iter().filter_map(|d| {
-            d.bundled
-                .clone()
-                .map(|path| (path, d.sha256.clone(), d.size))
-        }));
-        for (reference, sha256, size) in wanted {
-            let path = safe_relative(&reference)
-                .with_context(|| format!("{}: unsafe path {reference}", tool.name))?;
-            match shipped.get(&path) {
-                Some((other_sha, _)) if *other_sha == sha256 => {}
-                Some((_, other)) => {
-                    bail!(
-                        "{} and {other} both ship {path} with different content",
-                        tool.name
-                    )
-                }
-                None => {
-                    let dest = files.join(&path);
-                    if let Some(parent) = dest.parent() {
-                        fs::create_dir_all(parent)?;
-                    }
-                    source::download(&dir.join(&reference)?, &dest, Some((&sha256, size)))?;
-                    shipped.insert(path, (sha256, tool.name.clone()));
-                }
-            }
-        }
-        fs::write(files.join(format!("{}.lock", tool.name)), &lock_text)?;
-        locks.push((tool.name.clone(), lock));
-    }
-    for (name, _) in &locks {
-        for own in [name.clone(), format!("{name}.exe"), format!("{name}.lock")] {
-            if let Some((_, by)) = shipped.get(&own) {
-                bail!("{by} ships a file named {own}, which is reserved for the tool {name}");
-            }
-        }
-    }
-    let warnings = check_alignment(&locks, &def.align.required)?;
+    let blobs = stage.join("blobs");
+    fs::create_dir_all(&blobs).with_context(|| format!("creating {}", blobs.display()))?;
 
     let base = match &opts.base_url {
         Some(url) => Some(source::dir_url(source::locate(url, None)?)),
@@ -107,7 +56,7 @@ pub fn run(opts: &Options) -> Result<Assembled> {
     };
     let mut manifest = Manifest {
         version: FORMAT_VERSION,
-        tools: locks.iter().map(|(name, _)| name.clone()).collect(),
+        tools: def.tools.iter().map(|t| t.name.clone()).collect(),
         suite: def.suite.clone(),
         archive: BTreeMap::new(),
     };
@@ -117,26 +66,37 @@ pub fn run(opts: &Options) -> Result<Assembled> {
         &opts.platforms
     };
     let mut archives = Vec::new();
+    let mut warnings: Vec<String> = Vec::new();
     for platform in platforms {
+        let locks_dir = stage.join(platform);
+        fs::create_dir_all(&locks_dir)?;
+        let composed = compose(&def, &def_url, platform, &blobs, &locks_dir)
+            .with_context(|| format!("composing the release for {platform}"))?;
+        for warning in composed.warnings {
+            if !warnings.contains(&warning) {
+                warnings.push(warning);
+            }
+        }
+
         let bin = match opts.jarexec.iter().find(|(p, _)| p == platform) {
             Some((_, path)) => path.clone(),
             None => fetch_jarexec(&def.jarexec, platform, &stage)?,
         };
         let mut entries = Vec::new();
-        for (name, _) in &locks {
+        for tool in &manifest.tools {
             entries.push(Entry::new(
-                format!("{name}{}", exe_suffix(platform)),
+                format!("{tool}{}", exe_suffix(platform)),
                 &bin,
                 true,
             ));
             entries.push(Entry::new(
-                format!("{name}.lock"),
-                &files.join(format!("{name}.lock")),
+                format!("{tool}.lock"),
+                &locks_dir.join(format!("{tool}.lock")),
                 false,
             ));
         }
-        for path in shipped.keys() {
-            entries.push(Entry::new(path.clone(), &files.join(path), false));
+        for (path, (sha256, _)) in &composed.shipped {
+            entries.push(Entry::new(path.clone(), &blob(&blobs, sha256, path), false));
         }
         let file = format!(
             "{}-{release}-{platform}.{}",
@@ -166,6 +126,83 @@ pub fn run(opts: &Options) -> Result<Assembled> {
         archives,
         warnings,
     })
+}
+
+/// The tools as they ship on one platform.
+struct Composed {
+    /// archive path → (SHA-256, tool that brought it): tools share one folder
+    shipped: BTreeMap<String, (String, String)>,
+    warnings: Vec<String>,
+}
+
+/// Reads the tools' locks for `platform` (`{platform}` in a source stands for it),
+/// writes them to `locks_dir`, downloads the files they ship into `blobs` (by SHA-256,
+/// so that platforms sharing a file fetch it once) and checks the alignment.
+fn compose(
+    def: &SuiteDef,
+    def_url: &Url,
+    platform: &str,
+    blobs: &Path,
+    locks_dir: &Path,
+) -> Result<Composed> {
+    let mut shipped: BTreeMap<String, (String, String)> = BTreeMap::new();
+    let mut locks = Vec::new();
+    for tool in &def.tools {
+        let reference = tool.source.replace("{platform}", platform);
+        let dir = source::dir_url(source::locate(&reference, Some(def_url))?);
+        let lock_url = dir.join(&format!("{}.lock", tool.name))?;
+        let lock_text = source::read_text(&lock_url)?;
+        let lock =
+            Lockfile::parse(&lock_text).with_context(|| format!("invalid lockfile {lock_url}"))?;
+        let (Some(sha256), Some(size)) = (lock.app.sha256.clone(), lock.app.size) else {
+            bail!("{lock_url} has no SHA-256 for the JAR: regenerate it with jarexec 0.2 or later");
+        };
+        let mut wanted = vec![(lock.app.jar.clone(), sha256, size)];
+        wanted.extend(lock.deps.iter().filter_map(|d| {
+            d.bundled
+                .clone()
+                .map(|path| (path, d.sha256.clone(), d.size))
+        }));
+        for (reference, sha256, size) in wanted {
+            let path = safe_relative(&reference)
+                .with_context(|| format!("{}: unsafe path {reference}", tool.name))?;
+            match shipped.get(&path) {
+                Some((other_sha, _)) if *other_sha == sha256 => {}
+                Some((_, other)) => {
+                    bail!(
+                        "{} and {other} both ship {path} with different content",
+                        tool.name
+                    )
+                }
+                None => {
+                    let blob = blob(blobs, &sha256, &path);
+                    if !blob.exists() {
+                        fs::create_dir_all(blob.parent().unwrap())?;
+                        source::download(&dir.join(&reference)?, &blob, Some((&sha256, size)))?;
+                    }
+                    shipped.insert(path, (sha256, tool.name.clone()));
+                }
+            }
+        }
+        fs::write(locks_dir.join(format!("{}.lock", tool.name)), &lock_text)?;
+        locks.push((tool.name.clone(), lock));
+    }
+    for (name, _) in &locks {
+        for own in [name.clone(), format!("{name}.exe"), format!("{name}.lock")] {
+            if let Some((_, by)) = shipped.get(&own) {
+                bail!("{by} ships a file named {own}, which is reserved for the tool {name}");
+            }
+        }
+    }
+    let warnings = check_alignment(&locks, &def.align.required)?;
+    Ok(Composed { shipped, warnings })
+}
+
+/// Where a file shipped at `path` is staged: by SHA-256, keeping its name for the
+/// progress bar.
+fn blob(blobs: &Path, sha256: &str, path: &str) -> PathBuf {
+    let name = path.rsplit('/').next().unwrap_or(path);
+    blobs.join(sha256).join(name)
 }
 
 /// One JRE for the whole suite, and the same version of every `required` dependency.
@@ -651,6 +688,61 @@ pub(crate) mod tests {
         fs::write(dir.path().join("tool-b/tool-b.jar"), b"tampered").unwrap();
         let err = run(&options(&def, &dir.path().join("dist"), &bin)).unwrap_err();
         assert!(format!("{err:#}").contains("expected SHA-256"), "{err:#}");
+    }
+
+    #[test]
+    fn sources_can_differ_by_platform() {
+        let dir = tempfile::tempdir().unwrap();
+        let def = write_suite(dir.path(), "1.0", 1, ("1.0.0", "1.0.0"));
+        // tool-b with natives: one folder per platform, as `jarexec lock` leaves it
+        for (platform, native) in [("linux-x64", "linux-x86_64"), ("windows-x64", "win-x64")] {
+            write_tool(
+                &dir.path().join("tool-b").join(platform),
+                "tool-b",
+                b"tool-b",
+                &[
+                    ("com.example:commons:jar:1.0.0", b"1.0.0", true),
+                    (
+                        &format!("org.native:onnx:jar:{native}:1.0"),
+                        native.as_bytes(),
+                        true,
+                    ),
+                ],
+            );
+        }
+        let text = fs::read_to_string(&def)
+            .unwrap()
+            .replace("source = \"tool-b\"", "source = \"tool-b/{platform}\"");
+        fs::write(&def, text).unwrap();
+        let bin = dir.path().join("jarexec-bin");
+        fs::write(&bin, b"launcher").unwrap();
+
+        run(&options(&def, &dir.path().join("dist"), &bin)).unwrap();
+        let linux: Vec<_> = tar_names(&dir.path().join("dist/demo-1.0-linux-x64.tar.gz"))
+            .into_iter()
+            .map(|(name, _)| name)
+            .collect();
+        assert!(linux.contains(&"lib/onnx-1.0.jar".to_string()), "{linux:?}");
+        let mut zip = zip::ZipArchive::new(
+            File::open(dir.path().join("dist/demo-1.0-windows-x64.zip")).unwrap(),
+        )
+        .unwrap();
+        let mut native = String::new();
+        io::Read::read_to_string(&mut zip.by_name("lib/onnx-1.0.jar").unwrap(), &mut native)
+            .unwrap();
+        assert_eq!(native, "win-x64");
+
+        // a misalignment on one platform names it
+        write_tool(
+            &dir.path().join("tool-b/windows-x64"),
+            "tool-b",
+            b"tool-b",
+            &[("com.example:commons:jar:2.0.0", b"2.0.0", true)],
+        );
+        let err = run(&options(&def, &dir.path().join("dist"), &bin)).unwrap_err();
+        let err = format!("{err:#}");
+        assert!(err.contains("for windows-x64"), "{err}");
+        assert!(err.contains("must be aligned"), "{err}");
     }
 
     #[test]

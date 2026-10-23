@@ -51,7 +51,15 @@ version = "0.3.0"                     # jarexec release used as launcher
 [[tool]]
 name = "tool-a"
 source = "https://example.com/tool-a/1.4.0/"   # or a folder; holds tool-a.lock
+
+[[tool]]
+name = "tool-b"
+source = "tools/tool-b/{platform}"   # a lock per platform, e.g. for native libraries
 ```
+
+A tool whose dependencies change with the platform (native libraries in a classifier)
+has one lock per platform: `{platform}` in its `source` stands for each platform being
+built. The alignment checks then run for every platform, and an error names it.
 
 ```bash
 jarsuite assemble suite-def.toml -o dist --base-url https://example.com/mysuite/2026.11.0/
