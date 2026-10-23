@@ -106,10 +106,12 @@ code 2: close them and run `jarsuite activate`.
 
 ### Window
 
-`jarsuite-gui` does the same from a window: it shows the active, published, pending and
-previous release, and has buttons for *Check*, *Update*, *Activate*, *Roll back* and
-*Clean*, one *Launch* button per tool, and a progress bar for downloads. It is built
-with the `gui` feature:
+`jarsuite-gui` does the same from a window. A row shows the active, published, ready
+and previous release next to the action that matters now (*Update to…*, *Activate…* or
+*Check for updates*), and a dialog offers each newly published release once. Below,
+one card per tool shows its version and Java, with a *Launch* button. *Settings* holds
+the manifest, *Roll back* and *Clean*. Downloads show a progress bar. It is built with
+the `gui` feature:
 
 ```bash
 cargo build --release --features gui      # target/release/jarsuite-gui
@@ -119,7 +121,7 @@ jarsuite-gui [--root DIR]
 It finds the installation folder like `jarsuite`, so it can sit next to it. On Windows
 it opens no console; tools that need one open their own.
 
-The *Arguments* field is passed to the tool you launch. The window starts tools in the
+The *…* button of a card opens the arguments passed to that tool. The window starts tools in the
 installation folder, whatever folder it was opened from, while `jarsuite run` keeps the
 current one. When a tool exits with an error, the log shows the last lines it wrote to
 standard error.
